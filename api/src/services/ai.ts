@@ -4,6 +4,7 @@ import { createGoogleGenerativeAI } from "@ai-sdk/google";
 import { streamText, type CoreMessage } from "ai";
 import { AVAILABLE_MODELS, type AIProvider } from "../types";
 import { weatherTool, webSearchTool } from "./tools";
+import { getAllMCPTools } from "./mcp";
 
 // Initialize providers
 const openai = createOpenAI({
@@ -44,15 +45,22 @@ export async function streamChatResponse(
 ) {
   const model = getModelInstance(modelId);
 
+  // Get MCP tools from connected servers
+  const mcpTools = getAllMCPTools();
+
+  // Combine built-in tools with MCP tools
+  const allTools = {
+    webSearch: webSearchTool,
+    weather: weatherTool,
+    ...mcpTools,
+  };
+
   const result = streamText({
     model,
     messages,
     system:
       "You are a helpful AI assistant in a hacker-themed terminal interface called Neon Terminal. Be concise, helpful, and match the cyberpunk aesthetic in your responses when appropriate. You have access to tools like web search and weather lookup - use them when relevant to get current information.",
-    tools: {
-      webSearch: webSearchTool,
-      weather: weatherTool,
-    },
+    tools: allTools,
     maxSteps: 5, // Allow the model to call tools and continue
   });
 
