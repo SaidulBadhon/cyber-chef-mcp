@@ -17,11 +17,15 @@ import type { MCPServerConfig } from "../services/mcp";
  */
 
 export const mcpServersConfig: MCPServerConfig[] = [
-  // Everything - Local file search (macOS/Windows)
+  // Filesystem - Read/write/search files
   {
-    name: "everything",
+    name: "filesystem",
     command: "npx",
-    args: ["-y", "@modelcontextprotocol/server-everything"],
+    args: [
+      "-y",
+      "@modelcontextprotocol/server-filesystem",
+      "/Users/saidulbadhon", // Change this to your preferred directory
+    ],
     enabled: true,
   },
 

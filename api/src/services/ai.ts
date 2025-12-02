@@ -47,6 +47,7 @@ export async function streamChatResponse(
 
   // Get MCP tools from connected servers
   const mcpTools = getAllMCPTools();
+  const mcpToolNames = Object.keys(mcpTools);
 
   // Combine built-in tools with MCP tools
   const allTools = {
@@ -55,11 +56,22 @@ export async function streamChatResponse(
     ...mcpTools,
   };
 
+  // Build dynamic system prompt with available tools
+  const systemPrompt = `You are a helpful AI assistant in a hacker-themed terminal interface called Neon Terminal. Be concise, helpful, and match the cyberpunk aesthetic in your responses when appropriate.
+
+You have access to the following tools - USE THEM when relevant:
+- webSearch: Search the web for current information
+- weather: Get weather for a location
+${mcpToolNames.length > 0 ? `- MCP Tools: ${mcpToolNames.join(", ")}` : ""}
+
+IMPORTANT: When the user asks to search files, read files, list directories, or perform any file operation, USE the filesystem tools (like filesystem_search_files, filesystem_read_file, filesystem_list_directory). Do NOT say you can't access files - you CAN through the tools.
+
+When the user asks to remember something or recall information, use the memory tools.`;
+
   const result = streamText({
     model,
     messages,
-    system:
-      "You are a helpful AI assistant in a hacker-themed terminal interface called Neon Terminal. Be concise, helpful, and match the cyberpunk aesthetic in your responses when appropriate. You have access to tools like web search and weather lookup - use them when relevant to get current information.",
+    system: systemPrompt,
     tools: allTools,
     maxSteps: 5, // Allow the model to call tools and continue
   });
