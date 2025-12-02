@@ -48,15 +48,48 @@ chat.post("/stream", async (c) => {
 
       // Send session ID first
       await streamWriter.write(
-        `data: ${JSON.stringify({ type: "session", sessionId: session._id.toString() })}\n\n`
+        `data: ${JSON.stringify({
+          type: "session",
+          sessionId: session._id.toString(),
+        })}\n\n`
       );
 
-      // Stream text chunks
-      for await (const chunk of result.textStream) {
-        fullContent += chunk;
-        await streamWriter.write(
-          `data: ${JSON.stringify({ type: "text", content: chunk })}\n\n`
-        );
+      // Use fullStream to capture tool calls and text
+      for await (const part of result.fullStream) {
+        switch (part.type) {
+          case "tool-call":
+            // Send tool call info to the client
+            await streamWriter.write(
+              `data: ${JSON.stringify({
+                type: "tool-call",
+                toolName: part.toolName,
+                args: part.args,
+              })}\n\n`
+            );
+            break;
+
+          case "tool-result":
+            // Send tool result to the client
+            await streamWriter.write(
+              `data: ${JSON.stringify({
+                type: "tool-result",
+                toolName: part.toolName,
+                result: part.result,
+              })}\n\n`
+            );
+            break;
+
+          case "text-delta":
+            // Stream text chunks
+            fullContent += part.textDelta;
+            await streamWriter.write(
+              `data: ${JSON.stringify({
+                type: "text",
+                content: part.textDelta,
+              })}\n\n`
+            );
+            break;
+        }
       }
 
       // Save assistant message to session
@@ -71,7 +104,10 @@ chat.post("/stream", async (c) => {
 
       // Send done signal
       await streamWriter.write(
-        `data: ${JSON.stringify({ type: "done", sessionId: session._id.toString() })}\n\n`
+        `data: ${JSON.stringify({
+          type: "done",
+          sessionId: session._id.toString(),
+        })}\n\n`
       );
     });
   } catch (error) {
@@ -81,4 +117,3 @@ chat.post("/stream", async (c) => {
 });
 
 export default chat;
-

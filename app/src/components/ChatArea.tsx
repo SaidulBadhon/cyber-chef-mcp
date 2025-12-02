@@ -3,8 +3,9 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 import { ChatMessage } from "./ChatMessage";
 import { ChatInput } from "./ChatInput";
 import { ModelSelector } from "./ModelSelector";
-import { Terminal } from "lucide-react";
+import { Terminal, Cloud, Loader2 } from "lucide-react";
 import type { Message, AIModel } from "@/types";
+import type { ToolCallStatus } from "@/hooks/useChat";
 
 interface ChatAreaProps {
   messages: Message[];
@@ -14,6 +15,7 @@ interface ChatAreaProps {
   onSendMessage: (message: string) => void;
   onStopGeneration: () => void;
   isLoading: boolean;
+  toolCallStatus?: ToolCallStatus | null;
 }
 
 export function ChatArea({
@@ -24,6 +26,7 @@ export function ChatArea({
   onSendMessage,
   onStopGeneration,
   isLoading,
+  toolCallStatus,
 }: ChatAreaProps) {
   const scrollRef = useRef<HTMLDivElement>(null);
 
@@ -88,8 +91,43 @@ export function ChatArea({
           )}
           {isLoading && messages[messages.length - 1]?.content === "" && (
             <div className="flex items-center gap-2 text-neon-500 px-4">
-              <span className="animate-blink">▊</span>
-              <span className="text-sm">Processing...</span>
+              {toolCallStatus ? (
+                <>
+                  <Loader2 className="w-4 h-4 animate-spin" />
+                  <span className="text-sm">
+                    {toolCallStatus.status === "calling" ? (
+                      <>
+                        Calling{" "}
+                        <span className="font-mono text-neon-400">
+                          {toolCallStatus.toolName}
+                        </span>
+                        {toolCallStatus.args && (
+                          <span className="text-gray-500 ml-1">
+                            (
+                            {Object.entries(toolCallStatus.args)
+                              .map(([k, v]) => `${k}: ${v}`)
+                              .join(", ")}
+                            )
+                          </span>
+                        )}
+                      </>
+                    ) : (
+                      <>
+                        <Cloud className="w-4 h-4 inline mr-1" />
+                        Got result from{" "}
+                        <span className="font-mono text-neon-400">
+                          {toolCallStatus.toolName}
+                        </span>
+                      </>
+                    )}
+                  </span>
+                </>
+              ) : (
+                <>
+                  <span className="animate-blink">▊</span>
+                  <span className="text-sm">Processing...</span>
+                </>
+              )}
             </div>
           )}
         </div>
@@ -105,4 +143,3 @@ export function ChatArea({
     </div>
   );
 }
-

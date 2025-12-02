@@ -14,6 +14,7 @@ export default function App() {
     messages,
     isLoading,
     sessionId,
+    toolCallStatus,
     sendMessage,
     stopGeneration,
     clearMessages,
@@ -76,8 +77,8 @@ export default function App() {
         onSendMessage={handleSendMessage}
         onStopGeneration={stopGeneration}
         isLoading={isLoading}
+        toolCallStatus={toolCallStatus}
       />
     </div>
   );
 }
-

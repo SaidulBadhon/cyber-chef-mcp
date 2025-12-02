@@ -5,10 +5,20 @@ interface UseChatOptions {
   onError?: (error: Error) => void;
 }
 
+export interface ToolCallStatus {
+  toolName: string;
+  status: "calling" | "completed";
+  args?: Record<string, unknown>;
+  result?: unknown;
+}
+
 export function useChat(options: UseChatOptions = {}) {
   const [messages, setMessages] = useState<Message[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [sessionId, setSessionId] = useState<string | null>(null);
+  const [toolCallStatus, setToolCallStatus] = useState<ToolCallStatus | null>(
+    null
+  );
   const abortControllerRef = useRef<AbortController | null>(null);
 
   const sendMessage = useCallback(
@@ -73,7 +83,22 @@ export function useChat(options: UseChatOptions = {}) {
                 const data = JSON.parse(line.slice(6));
                 if (data.type === "session") {
                   setSessionId(data.sessionId);
+                } else if (data.type === "tool-call") {
+                  setToolCallStatus({
+                    toolName: data.toolName,
+                    status: "calling",
+                    args: data.args,
+                  });
+                } else if (data.type === "tool-result") {
+                  setToolCallStatus({
+                    toolName: data.toolName,
+                    status: "completed",
+                    result: data.result,
+                  });
+                  // Clear after a short delay
+                  setTimeout(() => setToolCallStatus(null), 500);
                 } else if (data.type === "text") {
+                  setToolCallStatus(null);
                   setMessages((prev) =>
                     prev.map((msg) =>
                       msg.id === assistantMessageId
@@ -92,10 +117,13 @@ export function useChat(options: UseChatOptions = {}) {
         if ((error as Error).name !== "AbortError") {
           options.onError?.(error as Error);
           // Remove failed assistant message
-          setMessages((prev) => prev.filter((m) => m.id !== assistantMessageId));
+          setMessages((prev) =>
+            prev.filter((m) => m.id !== assistantMessageId)
+          );
         }
       } finally {
         setIsLoading(false);
+        setToolCallStatus(null);
         abortControllerRef.current = null;
       }
     },
@@ -112,31 +140,34 @@ export function useChat(options: UseChatOptions = {}) {
     setSessionId(null);
   }, []);
 
-  const loadSession = useCallback(async (id: string) => {
-    try {
-      const response = await fetch(`/api/sessions/${id}`);
-      if (!response.ok) throw new Error("Failed to load session");
-      const session = await response.json();
-      setSessionId(session.id);
-      setMessages(
-        session.messages.map((m: Message) => ({
-          ...m,
-          createdAt: new Date(m.createdAt),
-        }))
-      );
-    } catch (error) {
-      options.onError?.(error as Error);
-    }
-  }, [options]);
+  const loadSession = useCallback(
+    async (id: string) => {
+      try {
+        const response = await fetch(`/api/sessions/${id}`);
+        if (!response.ok) throw new Error("Failed to load session");
+        const session = await response.json();
+        setSessionId(session.id);
+        setMessages(
+          session.messages.map((m: Message) => ({
+            ...m,
+            createdAt: new Date(m.createdAt),
+          }))
+        );
+      } catch (error) {
+        options.onError?.(error as Error);
+      }
+    },
+    [options]
+  );
 
   return {
     messages,
     isLoading,
     sessionId,
+    toolCallStatus,
     sendMessage,
     stopGeneration,
     clearMessages,
     loadSession,
   };
 }
-
