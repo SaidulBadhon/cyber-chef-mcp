@@ -1,85 +1,76 @@
-import { useEffect, useState } from "react";
-import { Bot } from "lucide-react";
 import {
   Select,
   SelectContent,
   SelectItem,
   SelectTrigger,
   SelectValue,
-} from "./ui/select";
-import { fetchModels } from "@/lib/utils";
-import type { ModelConfig, ModelProvider } from "@/types";
+} from "@/components/ui/select";
+import { getProviderIcon, getProviderColor } from "@/lib/utils";
+import type { AIModel } from "@/types";
 
 interface ModelSelectorProps {
-  selectedModel: { provider: ModelProvider; name: string } | null;
-  onSelectModel: (provider: ModelProvider, name: string) => void;
+  models: AIModel[];
+  selectedModel: AIModel | null;
+  onModelChange: (model: AIModel) => void;
+  disabled?: boolean;
 }
 
 export function ModelSelector({
+  models,
   selectedModel,
-  onSelectModel,
+  onModelChange,
+  disabled,
 }: ModelSelectorProps) {
-  const [models, setModels] = useState<ModelConfig[]>([]);
-
-  useEffect(() => {
-    loadModels();
-  }, []);
-
-  const loadModels = async () => {
-    try {
-      const data = await fetchModels();
-      setModels(data);
-      if (data.length > 0 && !selectedModel) {
-        onSelectModel(data[0].provider, data[0].id);
+  // Group models by provider
+  const groupedModels = models.reduce(
+    (acc, model) => {
+      if (!acc[model.provider]) {
+        acc[model.provider] = [];
       }
-    } catch (error) {
-      console.error("Failed to load models:", error);
-    }
-  };
-
-  const currentModel = models.find(
-    (m) =>
-      m.provider === selectedModel?.provider && m.name === selectedModel?.name
+      acc[model.provider].push(model);
+      return acc;
+    },
+    {} as Record<string, AIModel[]>
   );
-
-  const handleValueChange = (value: string) => {
-    const [provider, id] = value.split(":") as [ModelProvider, string];
-    onSelectModel(provider, id);
-  };
 
   return (
-    <div className="flex items-center gap-3">
-      <div className="flex items-center gap-2">
-        <Bot className="h-5 w-5 text-accent" />
-        <Select
-          value={
-            selectedModel
-              ? `${selectedModel.provider}:${selectedModel.name}`
-              : ""
-          }
-          onValueChange={handleValueChange}
-        >
-          <SelectTrigger className="w-[220px]">
-            <SelectValue placeholder="Select a model" />
-          </SelectTrigger>
-          <SelectContent>
-            {console.log(models)}
-            {models.map((model) => (
-              <SelectItem
-                key={`${model.provider}:${model.id}`}
-                value={`${model.provider}:${model.id}`}
-              >
-                {model.name}
+    <Select
+      value={selectedModel?.id || ""}
+      onValueChange={(value) => {
+        const model = models.find((m) => m.id === value);
+        if (model) onModelChange(model);
+      }}
+      disabled={disabled}
+    >
+      <SelectTrigger className="w-[220px]">
+        <SelectValue placeholder="Select model...">
+          {selectedModel && (
+            <span className="flex items-center gap-2">
+              <span>{getProviderIcon(selectedModel.provider)}</span>
+              <span className={getProviderColor(selectedModel.provider)}>
+                {selectedModel.name}
+              </span>
+            </span>
+          )}
+        </SelectValue>
+      </SelectTrigger>
+      <SelectContent>
+        {Object.entries(groupedModels).map(([provider, providerModels]) => (
+          <div key={provider}>
+            <div className="px-2 py-1.5 text-xs font-semibold text-gray-500 uppercase">
+              {getProviderIcon(provider)} {provider}
+            </div>
+            {providerModels.map((model) => (
+              <SelectItem key={model.id} value={model.id}>
+                <span className={getProviderColor(model.provider)}>
+                  {model.name}
+                </span>
               </SelectItem>
             ))}
-          </SelectContent>
-        </Select>
-      </div>
-      {currentModel && (
-        <span className="px-2 py-1 text-xs rounded-full bg-accent/20 text-accent border border-accent/30">
-          {currentModel.name}
-        </span>
-      )}
-    </div>
+          </div>
+        ))}
+      </SelectContent>
+    </Select>
   );
 }
+

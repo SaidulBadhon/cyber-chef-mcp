@@ -1,62 +1,42 @@
-export type ModelProvider = "openai" | "anthropic" | "gemini";
+export type AIProvider = "openai" | "anthropic" | "gemini";
 
-export interface ChatMessageInput {
-  role: "user" | "assistant";
-  content: string;
-}
-
-export interface ChatStreamRequest {
-  sessionId?: string;
-  modelProvider: ModelProvider;
-  modelName: string;
-  messages: ChatMessageInput[];
-}
-
-export interface SessionResponse {
-  _id: string;
-  title: string;
-  createdAt: string;
-  updatedAt: string;
-}
-
-export interface MessageResponse {
-  _id: string;
-  sessionId: string;
-  role: "user" | "assistant";
-  content: string;
-  modelProvider?: ModelProvider;
-  modelName?: string;
-  createdAt: string;
-}
-
-export interface ModelConfig {
-  provider: ModelProvider;
+export interface AIModel {
+  id: string;
   name: string;
-  displayName: string;
+  provider: AIProvider;
 }
 
-export const AVAILABLE_MODELS: ModelConfig[] = [
-  // { provider: "openai", name: "gpt-4.1", displayName: "OpenAI - GPT-4.1" },
-  { provider: "openai", name: "o4-mini", displayName: "OpenAI - o4-mini" },
-  { provider: "openai", name: "gpt-4o", displayName: "OpenAI - GPT-4o" },
-  {
-    provider: "anthropic",
-    name: "claude-sonnet-4-20250514",
-    displayName: "Anthropic - Claude Sonnet 4",
-  },
-  {
-    provider: "anthropic",
-    name: "claude-3-5-sonnet-20241022",
-    displayName: "Anthropic - Claude 3.5 Sonnet",
-  },
-  {
-    provider: "gemini",
-    name: "gemini-1.5-pro",
-    displayName: "Gemini - 1.5 Pro",
-  },
-  {
-    provider: "gemini",
-    name: "gemini-2.0-flash",
-    displayName: "Gemini - 2.0 Flash",
-  },
+export interface Message {
+  id: string;
+  role: "user" | "assistant";
+  content: string;
+  model?: string;
+  createdAt: Date;
+}
+
+export interface Session {
+  id: string;
+  title: string;
+  messages: Message[];
+  createdAt: Date;
+  updatedAt: Date;
+}
+
+export interface ChatRequest {
+  sessionId?: string;
+  message: string;
+  model: string;
+}
+
+export const AVAILABLE_MODELS: AIModel[] = [
+  // OpenAI Models
+  { id: "gpt-4.1", name: "GPT-4.1", provider: "openai" },
+  { id: "gpt-4o", name: "GPT-4o", provider: "openai" },
+  // Anthropic Models
+  { id: "claude-sonnet-4-20250514", name: "Claude Sonnet 4", provider: "anthropic" },
+  { id: "claude-3-5-sonnet-20241022", name: "Claude 3.5 Sonnet", provider: "anthropic" },
+  // Gemini Models
+  { id: "gemini-1.5-pro", name: "Gemini 1.5 Pro", provider: "gemini" },
+  { id: "gemini-2.0-flash-exp", name: "Gemini 2.0 Flash", provider: "gemini" },
 ];
+

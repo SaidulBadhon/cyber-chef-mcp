@@ -1,88 +1,83 @@
-import { useState, useCallback } from "react";
-import { Sidebar } from "./components/Sidebar";
-import { ChatWindow } from "./components/ChatWindow";
-import { ChatInput } from "./components/ChatInput";
-import { ModelSelector } from "./components/ModelSelector";
-import { useChat } from "./hooks/useChat";
-import { fetchSession } from "./lib/utils";
-import type { ModelProvider } from "./types";
+import { useState, useEffect } from "react";
+import { Sidebar } from "@/components/Sidebar";
+import { ChatArea } from "@/components/ChatArea";
+import { useChat } from "@/hooks/useChat";
+import { useModels } from "@/hooks/useModels";
+import { useSessions } from "@/hooks/useSessions";
+import type { AIModel } from "@/types";
 
-function App() {
-  const [selectedModel, setSelectedModel] = useState<{
-    provider: ModelProvider;
-    name: string;
-  } | null>(null);
-  const [refreshTrigger, setRefreshTrigger] = useState(0);
-
-  const handleSessionCreated = useCallback(() => {
-    setRefreshTrigger((prev) => prev + 1);
-  }, []);
-
+export default function App() {
+  const [selectedModel, setSelectedModel] = useState<AIModel | null>(null);
+  const { models } = useModels();
+  const { sessions, fetchSessions, deleteSession } = useSessions();
   const {
     messages,
-    isStreaming,
+    isLoading,
     sessionId,
     sendMessage,
-    stopStreaming,
+    stopGeneration,
+    clearMessages,
     loadSession,
-    clearSession,
-  } = useChat({ onSessionCreated: handleSessionCreated });
+  } = useChat({
+    onError: (error) => {
+      console.error("Chat error:", error);
+    },
+  });
+
+  // Set default model when models are loaded
+  useEffect(() => {
+    if (models.length > 0 && !selectedModel) {
+      setSelectedModel(models[0]);
+    }
+  }, [models, selectedModel]);
+
+  // Refresh sessions when a new message is sent
+  useEffect(() => {
+    if (sessionId) {
+      fetchSessions();
+    }
+  }, [sessionId, messages.length, fetchSessions]);
+
+  const handleNewChat = () => {
+    clearMessages();
+  };
 
   const handleSelectSession = async (id: string) => {
-    try {
-      const data = await fetchSession(id);
-      loadSession(id, data.messages);
-    } catch (error) {
-      console.error("Failed to load session:", error);
+    await loadSession(id);
+  };
+
+  const handleDeleteSession = async (id: string) => {
+    await deleteSession(id);
+    if (id === sessionId) {
+      clearMessages();
     }
   };
 
-  const handleNewChat = () => {
-    clearSession();
-  };
-
-  const handleSendMessage = (content: string) => {
-    if (!selectedModel) return;
-    sendMessage(content, selectedModel.provider, selectedModel.name);
-  };
-
-  const handleSelectModel = (provider: ModelProvider, name: string) => {
-    setSelectedModel({ provider, name });
+  const handleSendMessage = (message: string) => {
+    if (selectedModel) {
+      sendMessage(message, selectedModel);
+    }
   };
 
   return (
-    <div className="h-screen flex bg-background">
-      {/* Sidebar */}
+    <div className="flex h-screen bg-terminal-bg">
       <Sidebar
-        selectedSessionId={sessionId}
-        onSelectSession={handleSelectSession}
+        sessions={sessions}
+        currentSessionId={sessionId}
         onNewChat={handleNewChat}
-        refreshTrigger={refreshTrigger}
+        onSelectSession={handleSelectSession}
+        onDeleteSession={handleDeleteSession}
       />
-
-      {/* Main Content */}
-      <div className="flex-1 flex flex-col min-w-0">
-        {/* Header */}
-        <header className="border-b border-muted bg-card/50 px-6 py-4">
-          <ModelSelector
-            selectedModel={selectedModel}
-            onSelectModel={handleSelectModel}
-          />
-        </header>
-
-        {/* Chat Area */}
-        <ChatWindow messages={messages} isStreaming={isStreaming} />
-
-        {/* Input */}
-        <ChatInput
-          onSend={handleSendMessage}
-          onStop={stopStreaming}
-          isStreaming={isStreaming}
-          disabled={!selectedModel}
-        />
-      </div>
+      <ChatArea
+        messages={messages}
+        models={models}
+        selectedModel={selectedModel}
+        onModelChange={setSelectedModel}
+        onSendMessage={handleSendMessage}
+        onStopGeneration={stopGeneration}
+        isLoading={isLoading}
+      />
     </div>
   );
 }
 
-export default App;

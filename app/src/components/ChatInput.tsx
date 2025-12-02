@@ -1,15 +1,15 @@
-import { useState, useRef, useEffect, KeyboardEvent } from "react";
+import { useState, useRef, useEffect } from "react";
 import { Send, Square } from "lucide-react";
-import { Button } from "./ui/button";
+import { Button } from "@/components/ui/button";
 
 interface ChatInputProps {
   onSend: (message: string) => void;
-  onStop?: () => void;
-  isStreaming: boolean;
+  onStop: () => void;
+  isLoading: boolean;
   disabled?: boolean;
 }
 
-export function ChatInput({ onSend, onStop, isStreaming, disabled }: ChatInputProps) {
+export function ChatInput({ onSend, onStop, isLoading, disabled }: ChatInputProps) {
   const [input, setInput] = useState("");
   const textareaRef = useRef<HTMLTextAreaElement>(null);
 
@@ -20,61 +20,67 @@ export function ChatInput({ onSend, onStop, isStreaming, disabled }: ChatInputPr
     }
   }, [input]);
 
-  const handleSend = () => {
-    if (input.trim() && !isStreaming && !disabled) {
+  const handleSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (input.trim() && !isLoading && !disabled) {
       onSend(input.trim());
       setInput("");
-      if (textareaRef.current) {
-        textareaRef.current.style.height = "auto";
-      }
     }
   };
 
-  const handleKeyDown = (e: KeyboardEvent<HTMLTextAreaElement>) => {
+  const handleKeyDown = (e: React.KeyboardEvent) => {
     if (e.key === "Enter" && !e.shiftKey) {
       e.preventDefault();
-      handleSend();
+      handleSubmit(e);
     }
   };
 
   return (
-    <div className="border-t border-muted bg-card/50 p-4">
-      <div className="flex items-end gap-3 max-w-4xl mx-auto">
-        <div className="flex-1 relative">
-          <textarea
-            ref={textareaRef}
-            value={input}
-            onChange={(e) => setInput(e.target.value)}
-            onKeyDown={handleKeyDown}
-            placeholder="Type your message... (Shift+Enter for new line)"
-            disabled={disabled}
-            rows={1}
-            className="w-full resize-none bg-muted/50 border border-muted rounded-lg px-4 py-3 text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-accent focus:border-transparent disabled:opacity-50 disabled:cursor-not-allowed"
-          />
-        </div>
-        {isStreaming ? (
-          <Button
-            onClick={onStop}
-            variant="destructive"
-            size="icon"
-            className="h-12 w-12 shrink-0"
-          >
-            <Square className="h-5 w-5" />
-          </Button>
-        ) : (
-          <Button
-            onClick={handleSend}
-            disabled={!input.trim() || disabled}
-            size="icon"
-            className="h-12 w-12 shrink-0"
-          >
-            <Send className="h-5 w-5" />
-          </Button>
-        )}
+    <form
+      onSubmit={handleSubmit}
+      className="flex items-end gap-2 p-4 border-t border-terminal-border bg-terminal-bg"
+    >
+      <div className="flex-1 relative">
+        <textarea
+          ref={textareaRef}
+          value={input}
+          onChange={(e) => setInput(e.target.value)}
+          onKeyDown={handleKeyDown}
+          placeholder={disabled ? "Select a model to start..." : "Enter command..."}
+          disabled={disabled || isLoading}
+          rows={1}
+          className="w-full resize-none bg-terminal-surface border border-terminal-border rounded-lg px-4 py-3 text-gray-200 placeholder-gray-600 focus:outline-none focus:ring-2 focus:ring-neon-500 focus:border-transparent disabled:opacity-50"
+        />
+        <span className="absolute left-4 top-3 text-neon-500 opacity-50 pointer-events-none">
+          {">"}
+        </span>
+        <style>{`
+          textarea {
+            text-indent: 1rem;
+          }
+        `}</style>
       </div>
-      <p className="text-xs text-muted-foreground text-center mt-2">
-        Press Enter to send, Shift+Enter for new line
-      </p>
-    </div>
+      {isLoading ? (
+        <Button
+          type="button"
+          onClick={onStop}
+          variant="destructive"
+          size="icon"
+          className="h-12 w-12"
+        >
+          <Square className="h-5 w-5" />
+        </Button>
+      ) : (
+        <Button
+          type="submit"
+          disabled={!input.trim() || disabled}
+          size="icon"
+          className="h-12 w-12"
+        >
+          <Send className="h-5 w-5" />
+        </Button>
+      )}
+    </form>
   );
 }
+

@@ -1,69 +1,50 @@
 import { useState, useCallback, useRef } from "react";
-import type { ChatMessage, ModelProvider, StreamResponse } from "@/types";
-import { API_URL } from "@/lib/utils";
+import type { Message, AIModel } from "@/types";
 
 interface UseChatOptions {
-  onSessionCreated?: (sessionId: string) => void;
+  onError?: (error: Error) => void;
 }
 
-export function useChat(options?: UseChatOptions) {
-  const [messages, setMessages] = useState<ChatMessage[]>([]);
-  const [isStreaming, setIsStreaming] = useState(false);
+export function useChat(options: UseChatOptions = {}) {
+  const [messages, setMessages] = useState<Message[]>([]);
+  const [isLoading, setIsLoading] = useState(false);
   const [sessionId, setSessionId] = useState<string | null>(null);
   const abortControllerRef = useRef<AbortController | null>(null);
 
-  const loadSession = useCallback((id: string, sessionMessages: ChatMessage[]) => {
-    setSessionId(id);
-    setMessages(sessionMessages);
-  }, []);
-
-  const clearSession = useCallback(() => {
-    setSessionId(null);
-    setMessages([]);
-  }, []);
-
   const sendMessage = useCallback(
-    async (
-      content: string,
-      modelProvider: ModelProvider,
-      modelName: string
-    ) => {
-      if (!content.trim() || isStreaming) return;
+    async (content: string, model: AIModel) => {
+      if (!content.trim() || isLoading) return;
 
-      const userMessage: ChatMessage = {
+      // Add user message
+      const userMessage: Message = {
+        id: crypto.randomUUID(),
         role: "user",
-        content: content.trim(),
+        content,
+        createdAt: new Date(),
       };
+      setMessages((prev) => [...prev, userMessage]);
+      setIsLoading(true);
 
-      const newMessages = [...messages, userMessage];
-      setMessages(newMessages);
-      setIsStreaming(true);
-
-      const assistantMessage: ChatMessage = {
+      // Create placeholder for assistant message
+      const assistantMessageId = crypto.randomUUID();
+      const assistantMessage: Message = {
+        id: assistantMessageId,
         role: "assistant",
         content: "",
-        modelProvider,
-        modelName,
+        model: model.id,
+        createdAt: new Date(),
       };
-
-      setMessages([...newMessages, assistantMessage]);
+      setMessages((prev) => [...prev, assistantMessage]);
 
       try {
         abortControllerRef.current = new AbortController();
-
-        const response = await fetch(`${API_URL}/api/chat/stream`, {
+        const response = await fetch("/api/chat/stream", {
           method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-          },
+          headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
             sessionId,
-            modelProvider,
-            modelName,
-            messages: newMessages.map((m) => ({
-              role: m.role,
-              content: m.content,
-            })),
+            message: content,
+            model: model.id,
           }),
           signal: abortControllerRef.current.signal,
         });
@@ -73,89 +54,89 @@ export function useChat(options?: UseChatOptions) {
         }
 
         const reader = response.body?.getReader();
-        if (!reader) {
-          throw new Error("No response body");
-        }
+        if (!reader) throw new Error("No response body");
 
         const decoder = new TextDecoder();
-        let fullContent = "";
+        let buffer = "";
 
         while (true) {
           const { done, value } = await reader.read();
           if (done) break;
 
-          const chunk = decoder.decode(value, { stream: true });
-          const lines = chunk.split("\n");
+          buffer += decoder.decode(value, { stream: true });
+          const lines = buffer.split("\n\n");
+          buffer = lines.pop() || "";
 
           for (const line of lines) {
             if (line.startsWith("data: ")) {
               try {
-                const data: StreamResponse = JSON.parse(line.slice(6));
-                
-                if (data.text) {
-                  fullContent += data.text;
-                  setMessages((prev) => {
-                    const updated = [...prev];
-                    updated[updated.length - 1] = {
-                      ...updated[updated.length - 1],
-                      content: fullContent,
-                    };
-                    return updated;
-                  });
+                const data = JSON.parse(line.slice(6));
+                if (data.type === "session") {
+                  setSessionId(data.sessionId);
+                } else if (data.type === "text") {
+                  setMessages((prev) =>
+                    prev.map((msg) =>
+                      msg.id === assistantMessageId
+                        ? { ...msg, content: msg.content + data.content }
+                        : msg
+                    )
+                  );
                 }
-
-                if (data.done && data.sessionId) {
-                  if (!sessionId) {
-                    setSessionId(data.sessionId);
-                    options?.onSessionCreated?.(data.sessionId);
-                  }
-                }
-
-                if (data.error) {
-                  throw new Error(data.error);
-                }
-              } catch (e) {
-                if (e instanceof SyntaxError) continue;
-                throw e;
+              } catch {
+                // Ignore parse errors
               }
             }
           }
         }
       } catch (error) {
-        if ((error as Error).name === "AbortError") {
-          console.log("Request aborted");
-        } else {
-          console.error("Error sending message:", error);
-          setMessages((prev) => {
-            const updated = [...prev];
-            updated[updated.length - 1] = {
-              ...updated[updated.length - 1],
-              content: "Error: Failed to get response. Please try again.",
-            };
-            return updated;
-          });
+        if ((error as Error).name !== "AbortError") {
+          options.onError?.(error as Error);
+          // Remove failed assistant message
+          setMessages((prev) => prev.filter((m) => m.id !== assistantMessageId));
         }
       } finally {
-        setIsStreaming(false);
+        setIsLoading(false);
         abortControllerRef.current = null;
       }
     },
-    [messages, sessionId, isStreaming, options]
+    [sessionId, isLoading, options]
   );
 
-  const stopStreaming = useCallback(() => {
-    if (abortControllerRef.current) {
-      abortControllerRef.current.abort();
-    }
+  const stopGeneration = useCallback(() => {
+    abortControllerRef.current?.abort();
+    setIsLoading(false);
   }, []);
+
+  const clearMessages = useCallback(() => {
+    setMessages([]);
+    setSessionId(null);
+  }, []);
+
+  const loadSession = useCallback(async (id: string) => {
+    try {
+      const response = await fetch(`/api/sessions/${id}`);
+      if (!response.ok) throw new Error("Failed to load session");
+      const session = await response.json();
+      setSessionId(session.id);
+      setMessages(
+        session.messages.map((m: Message) => ({
+          ...m,
+          createdAt: new Date(m.createdAt),
+        }))
+      );
+    } catch (error) {
+      options.onError?.(error as Error);
+    }
+  }, [options]);
 
   return {
     messages,
-    isStreaming,
+    isLoading,
     sessionId,
     sendMessage,
-    stopStreaming,
+    stopGeneration,
+    clearMessages,
     loadSession,
-    clearSession,
   };
 }
+

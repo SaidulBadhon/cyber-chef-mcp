@@ -5,30 +5,29 @@ export function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs));
 }
 
-export const API_URL = import.meta.env.VITE_API_URL || "";
-
-export async function fetchSessions() {
-  const res = await fetch(`${API_URL}/api/sessions`);
-  if (!res.ok) throw new Error("Failed to fetch sessions");
-  return res.json();
+export function getProviderColor(provider: string): string {
+  switch (provider) {
+    case "openai":
+      return "text-emerald-400";
+    case "anthropic":
+      return "text-orange-400";
+    case "gemini":
+      return "text-blue-400";
+    default:
+      return "text-neon-500";
+  }
 }
 
-export async function fetchSession(id: string) {
-  const res = await fetch(`${API_URL}/api/sessions/${id}`);
-  if (!res.ok) throw new Error("Failed to fetch session");
-  return res.json();
+export function getProviderIcon(provider: string): string {
+  switch (provider) {
+    case "openai":
+      return "🤖";
+    case "anthropic":
+      return "🧠";
+    case "gemini":
+      return "💎";
+    default:
+      return "⚡";
+  }
 }
 
-export async function deleteSession(id: string) {
-  const res = await fetch(`${API_URL}/api/sessions/${id}`, {
-    method: "DELETE",
-  });
-  if (!res.ok) throw new Error("Failed to delete session");
-  return res.json();
-}
-
-export async function fetchModels() {
-  const res = await fetch(`${API_URL}/api/models`);
-  if (!res.ok) throw new Error("Failed to fetch models");
-  return res.json();
-}

@@ -1,30 +1,31 @@
-export type ModelProvider = "openai" | "anthropic" | "gemini";
+export type AIProvider = "openai" | "anthropic" | "gemini";
 
-export interface ChatMessage {
-  _id?: string;
+export interface AIModel {
+  id: string;
+  name: string;
+  provider: AIProvider;
+}
+
+export interface Message {
+  id: string;
   role: "user" | "assistant";
   content: string;
-  modelProvider?: ModelProvider;
-  modelName?: string;
-  createdAt?: string;
+  model?: string;
+  createdAt: Date;
 }
 
-export interface ChatSession {
-  _id: string;
+export interface Session {
+  id: string;
   title: string;
-  createdAt: string;
-  updatedAt: string;
+  messages: Message[];
+  createdAt: Date;
+  updatedAt: Date;
 }
 
-export interface ModelConfig {
-  provider: ModelProvider;
-  name: string;
-  displayName: string;
+export interface SessionSummary {
+  id: string;
+  title: string;
+  createdAt: Date;
+  updatedAt: Date;
 }
 
-export interface StreamResponse {
-  text?: string;
-  done?: boolean;
-  sessionId?: string;
-  error?: string;
-}
